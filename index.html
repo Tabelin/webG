@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Генератор мира (тест3)</title>
+    <style>
+    /* ... (стили те же) ... */
+    body {
+        margin: 0;
+        background: #111;
+        font-family: Arial, sans-serif;
+        color: white;
+        padding: 20px;
+    }
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .controls {
+        background: #222;
+        padding: 15px;
+        border-radius: 10px;
+        width: 80%;
+        max-width: 600px;
+        margin-bottom: 20px;
+    }
+    .slider-container {
+        margin: 10px 0;
+    }
+    label {
+        display: inline-block;
+        width: 240px;
+    }
+    input[type="range"] {
+        width: 200px;
+    }
+    span.value {
+        display: inline-block;
+        width: 50px;
+        text-align: right;
+    }
+    canvas {
+        border: 2px solid #333;
+        image-rendering: pixelated;
+        margin-top: 10px;
+    }
+    button {
+        background: #0066cc;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+    button:hover {
+        background: #0055aa;
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Генератор мира — Без луж и мелких островов</h1>
+        <p>Нажми <strong>B</strong>, чтобы поставить бур.</p>
+
+        <div class="controls">
+            <div class="slider-container">
+                <label for="scale">Масштаб шума:</label>
+                <input type="range" id="scale" min="5" max="50" value="20" step="1"/>
+                <span class="value" id="scaleValue">20</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="islandSize">Размер островов:</label>
+                <input type="range" id="islandSize" min="0.5" max="3.0" value="1.0" step="0.1"/>
+                <span class="value" id="islandSizeValue">1.0</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="waterAmount">Кол-во воды:</label>
+                <input type="range" id="waterAmount" min="0.1" max="0.9" value="0.3" step="0.05"/>
+                <span class="value" id="waterAmountValue">0.3</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="oreChance">Шанс руды (%):</label>
+                <input type="range" id="oreChance" min="1" max="30" value="10" step="1"/>
+                <span class="value" id="oreChanceValue">10</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="tileSize">Размер тайла:</label>
+                <input type="range" id="tileSize" min="10" max="40" value="20" step="2"/>
+                <span class="value" id="tileSizeValue">20</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="width">Ширина карты:</label>
+                <input type="range" id="width" min="20" max="100" value="50" step="1"/>
+                <span class="value" id="widthValue">50</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="height">Высота карты:</label>
+                <input type="range" id="height" min="20" max="100" value="40" step="1"/>
+                <span class="value" id="heightValue">40</span>
+            </div>
+
+            <button id="regenerate">Пересоздать мир</button>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Элементы управления
+        const scaleInput = document.getElementById("scale");
+        const islandSizeInput = document.getElementById("islandSize");
+        const waterAmountInput = document.getElementById("waterAmount");
+        const oreChanceInput = document.getElementById("oreChance");
+        const tileSizeInput = document.getElementById("tileSize");
+        const widthInput = document.getElementById("width");
+        const heightInput = document.getElementById("height");
+        const regenerateBtn = document.getElementById("regenerate");
+
+        const scaleValue = document.getElementById("scaleValue");
+        const islandSizeValue = document.getElementById("islandSizeValue");
+        const waterAmountValue = document.getElementById("waterAmountValue");
+        const oreChanceValue = document.getElementById("oreChanceValue");
+        const tileSizeValue = document.getElementById("tileSizeValue");
+        const widthValue = document.getElementById("widthValue");
+        const heightValue = document.getElementById("heightValue");
+
+        let TILE_SIZE = 20;
+        let WIDTH = 50;
+        let HEIGHT = 40;
+        let world = [];
+        let buildings = [];
+        let isBuildingMode = false;
+
+        function updateValues() {
+            scaleValue.textContent = scaleInput.value;
+            islandSizeValue.textContent = islandSizeInput.value;
+            waterAmountValue.textContent = waterAmountInput.value;
+            oreChanceValue.textContent = oreChanceInput.value;
+            tileSizeValue.textContent = tileSizeInput.value;
+            widthValue.textContent = widthInput.value;
+            heightValue.textContent = heightInput.value;
+        }
+
+        // Flood Fill — находит все связанные тайлы одного типа
+        function floodFill(startX, startY, isWater) {
+            const visited = new Set();
+            const queue = [];
+            const region = [];
+
+            const key = (x, y) => `${x},${y}`;
+            const isValid = (x, y) => x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT;
+
+            queue.push([startX, startY]);
+            visited.add(key(startX, startY));
+
+            const targetTerrain = isWater ? "WATER" : "LAND";
+
+            while (queue.length > 0) {
+                const [x, y] = queue.shift();
+                const tile = world[y][x];
+                const isMatch = isWater ? tile.terrain === "WATER" : tile.terrain !== "WATER" && tile.terrain !== "LAVA";
+
+                if (!isMatch) continue;
+
+                region.push({ x, y });
+
+                const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx, ny = y + dy;
+                    const nKey = key(nx, ny);
+                    if (isValid(nx, ny) && !visited.has(nKey)) {
+                        visited.add(nKey);
+                        queue.push([nx, ny]);
+                    }
+                }
+            }
+
+            return region;
+        }
+
+        // Удалить маленькие области
+        function removeSmallAreas() {
+            const visitedWater = new Set();
+            const visitedLand = new Set();
+            const key = (x, y) => `${x},${y}`;
+
+            // 1. Удаляем маленькие водоёмы (< 7 тайлов)
+            for (let y = 0; y < HEIGHT; y++) {
+                for (let x = 0; x < WIDTH; x++) {
+                    const k = key(x, y);
+                    if (!visitedWater.has(k) && world[y][x].terrain === "WATER") {
+                        const region = floodFill(x, y, true);
+                        if (region.length < 7) {
+                            // Удаляем — делаем землю
+                            for (const {x: rx, y: ry} of region) {
+                                world[ry][rx].terrain = "GRASS";
+                                visitedWater.add(key(rx, ry));
+                            }
+                        } else {
+                            region.forEach(t => visitedWater.add(key(t.x, t.y)));
+                        }
+                    }
+                }
+            }
+
+            // 2. Удаляем маленькие острова (< 20 тайлов)
+            for (let y = 0; y < HEIGHT; y++) {
+                for (let x = 0; x < WIDTH; x++) {
+                    const k = key(x, y);
+                    if (!visitedLand.has(k) && world[y][x].terrain !== "WATER" && world[y][x].terrain !== "LAVA") {
+                        const region = floodFill(x, y, false);
+                        if (region.length < 20) {
+                            // Удаляем — делаем воду (или песок, но лучше воду)
+                            for (const {x: rx, y: ry} of region) {
+                                world[ry][rx].terrain = "WATER";
+                                visitedLand.add(key(rx, ry));
+                            }
+                        } else {
+                            region.forEach(t => visitedLand.add(key(t.x, t.y)));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Генерация мира
+        function generateWorld() {
+            const scale = parseFloat(scaleInput.value);
+            const islandSize = parseFloat(islandSizeInput.value);
+            const waterLevel = parseFloat(waterAmountInput.value);
+            const oreChance = parseFloat(oreChanceInput.value) / 100;
+            TILE_SIZE = parseInt(tileSizeInput.value);
+            WIDTH = parseInt(widthInput.value);
+            HEIGHT = parseInt(heightInput.value);
+
+            canvas.width = WIDTH * TILE_SIZE;
+            canvas.height = HEIGHT * TILE_SIZE;
+
+            world = [];
+            const noiseMap = [];
+
+            // Генерация шума
+            for (let y = 0; y < HEIGHT; y++) {
+                const row = [];
+                for (let x = 0; x < WIDTH; x++) {
+                    const noise = Math.perlin2(x / (scale / islandSize), y / (scale / islandSize));
+                    row.push(noise);
+                }
+                noiseMap.push(row);
+            }
+
+            // Заполнение мира
+            for (let y = 0; y < HEIGHT; y++) {
+                const row = [];
+                for (let x = 0; x < WIDTH; x++) {
+                    const noise = noiseMap[y][x];
+                    let terrain = "GRASS";
+
+                    if (noise < waterLevel) {
+                        terrain = "WATER";
+                    } else if (noise < waterLevel + 0.1) {
+                        let hasWater = false;
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                const nx = x + dx, ny = y + dy;
+                                if (nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT && noiseMap[ny][nx] < waterLevel) {
+                                    hasWater = true;
+                                }
+                            }
+                        }
+                        terrain = hasWater ? "SAND" : "GRASS";
+                    } else if (noise < 0.5) {
+                        terrain = "CLAY";
+                    } else if (noise < 0.6) {
+                        terrain = "LAVA";
+                    } else {
+                        terrain = "GRASS";
+                    }
+
+                    // Защита: лава не рядом с водой
+                    if (terrain === "LAVA") {
+                        let hasWaterNear = false;
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                const nx = x + dx, ny = y + dy;
+                                if (nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT && noiseMap[ny][nx] < waterLevel) {
+                                    hasWaterNear = true;
+                                }
+                            }
+                        }
+                        if (hasWaterNear) terrain = "CLAY";
+                    }
+
+                    row.push({ terrain, ore: null, x, y });
+                }
+                world.push(row);
+            }
+
+            // 🔥 Удаляем маленькие области
+            removeSmallAreas();
+
+            // Повторно добавляем руду (только на сухую землю)
+            for (let y = 0; y < HEIGHT; y++) {
+                for (let x = 0; x < WIDTH; x++) {
+                    const tile = world[y][x];
+                    if (Math.random() < oreChance && tile.terrain !== "WATER" && tile.terrain !== "LAVA") {
+                        const r = Math.random();
+                        tile.ore = r < 0.5 ? "COPPER" : r < 0.8 ? "LEAD" : "COAL";
+                    }
+                }
+            }
+
+            buildings = [];
+            drawWorld();
+        }
+
+        // Рисование — без изменений
+        function drawWorld() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let y = 0; y < HEIGHT; y++) {
+                for (let x = 0; x < WIDTH; x++) {
+                    const tile = world[y][x];
+                    const screenX = x * TILE_SIZE;
+                    const screenY = y * TILE_SIZE;
+
+                    let color = "#4CAF50";
+                    if (tile.terrain === "SAND") color = "#D2B48C";
+                    else if (tile.terrain === "WATER") color = "#1E90FF";
+                    else if (tile.terrain === "LAVA") color = "#FF4500";
+                    else if (tile.terrain === "CLAY") color = "#A0522D";
+
+                    ctx.fillStyle = color;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+
+                    if (tile.ore) {
+                        const oreColor = tile.ore === "COPPER" ? "#B87333" :
+                                        tile.ore === "LEAD" ? "#696969" : "#363636";
+                        const pad = TILE_SIZE * 0.2;
+                        ctx.fillStyle = oreColor;
+                        ctx.fillRect(screenX + pad, screenY + pad, TILE_SIZE - 2*pad, TILE_SIZE - 2*pad);
+                    }
+
+                    if (buildings.some(b => b.x === x && b.y === y)) {
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(screenX + 6, screenY + 6, TILE_SIZE - 12, TILE_SIZE - 12);
+                        ctx.fillStyle = "gray";
+                        ctx.fillRect(screenX + 8, screenY + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+                    }
+
+                    ctx.strokeStyle = "#0008";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                }
+            }
+
+            if (isBuildingMode && window.lastMouseX !== undefined) {
+                const gridX = Math.floor(window.lastMouseX / TILE_SIZE);
+                const gridY = Math.floor(window.lastMouseY / TILE_SIZE);
+                if (gridX >= 0 && gridX < WIDTH && gridY >= 0 && gridY < HEIGHT) {
+                    const tile = world[gridY][gridX];
+                    const canBuild = tile.ore && !buildings.some(b => b.x === gridX && b.y === gridY);
+                    ctx.strokeStyle = canBuild ? "#0F0" : "#F00";
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(gridX * TILE_SIZE, gridY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    ctx.lineWidth = 1;
+                }
+            }
+        }
+
+        function placeDrill(x, y) {
+            const tile = world[y][x];
+            if (tile.ore && !buildings.some(b => b.x === x && b.y === y)) {
+                buildings.push({ x, y });
+                drawWorld();
+            }
+        }
+
+        // Вспомогательные
+        Math.perlin2 = (x, y) => {
+            const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 + Math.sin(x * 4.2323 + y * 5.123);
+            return n - Math.floor(n);
+        };
+
+        canvas.addEventListener("mousemove", e => {
+            const rect = canvas.getBoundingClientRect();
+            window.lastMouseX = e.clientX - rect.left;
+            window.lastMouseY = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener("click", e => {
+            if (!isBuildingMode) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+            if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT) placeDrill(x, y);
+        });
+
+        document.addEventListener("keydown", e => {
+            if (e.key === "b" || e.key === "B") {
+                isBuildingMode = !isBuildingMode;
+                drawWorld();
+            }
+        });
+
+        // Ползунки
+        scaleInput.addEventListener("input", updateValues);
+        islandSizeInput.addEventListener("input", updateValues);
+        waterAmountInput.addEventListener("input", updateValues);
+        oreChanceInput.addEventListener("input", updateValues);
+        tileSizeInput.addEventListener("input", updateValues);
+        widthInput.addEventListener("input", updateValues);
+        heightInput.addEventListener("input", updateValues);
+        regenerateBtn.addEventListener("click", generateWorld);
+
+        updateValues();
+        generateWorld();
+    </script>
+</body>
+</html>
