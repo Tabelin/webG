@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Генератор мира с настройками</title>
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            font-family: Arial, sans-serif;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .controls {
+            background: #222;
+            padding: 15px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        label {
+            display: inline-block;
+            width: 200px;
+        }
+        input[type="range"] {
+            width: 200px;
+        }
+        span.value {
+            display: inline-block;
+            width: 50px;
+            text-align: right;
+        }
+        canvas {
+            border: 2px solid #333;
+            image-rendering: pixelated;
+            margin-top: 10px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0055aa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Генератор мира (тест2)</h1>
+        <p>Нажми <strong>B</strong>, чтобы включить режим строительства. Кликни на руду, чтобы поставить бур.</p>
+
+        <div class="controls">
+            <div class="slider-container">
+                <label for="scale">Масштаб шума:</label>
+                <input type="range" id="scale" min="5" max="50" value="20" step="1"/>
+                <span class="value" id="scaleValue">20</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="oreChance">Шанс руды (%):</label>
+                <input type="range" id="oreChance" min="1" max="30" value="10" step="1"/>
+                <span class="value" id="oreChanceValue">10</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="tileSize">Размер тайла:</label>
+                <input type="range" id="tileSize" min="10" max="40" value="20" step="2"/>
+                <span class="value" id="tileSizeValue">20</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="width">Ширина карты:</label>
+                <input type="range" id="width" min="20" max="100" value="40" step="1"/>
+                <span class="value" id="widthValue">40</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="height">Высота карты:</label>
+                <input type="range" id="height" min="20" max="100" value="30" step="1"/>
+                <span class="value" id="heightValue">30</span>
+            </div>
+
+            <button id="regenerate">Пересоздать мир</button>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+    </div>
+<script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Элементы управления
+        const scaleInput = document.getElementById("scale");
+        const oreChanceInput = document.getElementById("oreChance");
+        const tileSizeInput = document.getElementById("tileSize");
+        const widthInput = document.getElementById("width");
+        const heightInput = document.getElementById("height");
+        const regenerateBtn = document.getElementById("regenerate");
+
+        const scaleValue = document.getElementById("scaleValue");
+        const oreChanceValue = document.getElementById("oreChanceValue");
+        const tileSizeValue = document.getElementById("tileSizeValue");
+        const widthValue = document.getElementById("widthValue");
+        const heightValue = document.getElementById("heightValue");
+
+        let TILE_SIZE = 20;
+        let WIDTH = 40;
+        let HEIGHT = 30;
+        let world = [];
+        let buildings = [];
+        let isBuildingMode = false;
+
+        // Обновление значений ползунков
+        function updateValues() {
+            scaleValue.textContent = scaleInput.value;
+            oreChanceValue.textContent = oreChanceInput.value;
+            tileSizeValue.textContent = tileSizeInput.value;
+            widthValue.textContent = widthInput.value;
+            heightValue.textContent = heightInput.value;
+        }
+
+        // Генерация мира
+        function generateWorld() {
+            const scale = parseFloat(scaleInput.value);
+            const oreChance = parseFloat(oreChanceInput.value) / 100;
+            TILE_SIZE = parseInt(tileSizeInput.value);
+            WIDTH = parseInt(widthInput.value);
+            HEIGHT = parseInt(heightInput.value);
+ // Изменяем размер canvas
+            canvas.width = WIDTH * TILE_SIZE;
+            canvas.height = HEIGHT * TILE_SIZE;
+
+            world = [];
+            for (let y = 0; y < HEIGHT; y++) {
+                const row = [];
+                for (let x = 0; x < WIDTH; x++) {
+                    const noise = Math.perlin2(x / scale, y / scale);
+                    let terrain, ore = null;
+
+                    if (noise < 0.3) terrain = "WATER";
+                    else if (noise < 0.4) terrain = "SAND";
+                    else if (noise < 0.5) terrain = "CLAY";
+                    else if (noise < 0.6) terrain = "LAVA";
+                    else terrain = "GRASS"; // Теперь земля — зелёная (трава)
+
+                    // Руда
+                    if (Math.random() < oreChance && terrain !== "WATER" && terrain !== "LAVA") {
+                        const r = Math.random();
+                        ore = r < 0.5 ? "COPPER" : r < 0.8 ? "LEAD" : "COAL";
+                    }
+
+                    row.push({ terrain, ore, x, y });
+                }
+                world.push(row);
+            }
+            buildings = []; // Очистка построек
+            drawWorld();
+        }
+         // Рисование мира
+        function drawWorld() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < HEIGHT; y++) {
+                for (let x = 0; x < WIDTH; x++) {
+                    const tile = world[y][x];
+                    const screenX = x * TILE_SIZE;
+                    const screenY = y * TILE_SIZE;
+
+                    // Рисуем поверхность
+                    let terrainColor = "#8B4513"; // default
+                    if (tile.terrain === "GRASS") terrainColor = "#4CAF50";
+                    else if (tile.terrain === "SAND") terrainColor = "#D2B48C";
+                    else if (tile.terrain === "WATER") terrainColor = "#1E90FF";
+                    else if (tile.terrain === "LAVA") terrainColor = "#FF4500";
+                    else if (tile.terrain === "CLAY") terrainColor = "#A0522D";
+
+                    ctx.fillStyle = terrainColor;
+                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+
+                    // Рисуем руду
+                    if (tile.ore) {
+                        let oreColor = "#363636";
+                        if (tile.ore === "COPPER") oreColor = "#B87333";
+                        else if (tile.ore === "LEAD") oreColor = "#696969";
+                        else if (tile.ore === "COAL") oreColor = "#363636";
+
+                        const pad = TILE_SIZE * 0.2;
+                        ctx.fillStyle = oreColor;
+                        ctx.fillRect(screenX + pad, screenY + pad, TILE_SIZE - pad * 2, TILE_SIZE - pad * 2);
+                    }
+
+                    // Рисуем бур
+                    if (buildings.some(b => b.x === x && b.y === y)) {
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(screenX + TILE_SIZE * 0.3, screenY + TILE_SIZE * 0.3, TILE_SIZE * 0.4, TILE_SIZE * 0.4);
+                        ctx.fillStyle = "gray";
+                        ctx.fillRect(screenX + TILE_SIZE * 0.4, screenY + TILE_SIZE * 0.4, TILE_SIZE * 0.2, TILE_SIZE * 0.2);
+                    }
+
+                    // Сетка
+                    ctx.strokeStyle = "#0008";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+                }
+            }
+
+            // Превью бура
+            if (isBuildingMode) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = window.event?.clientX - rect.left;
+                const my = window.event?.clientY - rect.top;
+                if (mx !== undefined) {
+                    const gridX = Math.floor(mx / TILE_SIZE);
+                    const gridY = Math.floor(my / TILE_SIZE);
+                    if (gridX >= 0 && gridX < WIDTH && gridY >= 0 && gridY < HEIGHT) {
+                        const tile = world[gridY][gridX];
+                        const canBuild = tile.ore && !buildings.some(b => b.x === gridX && b.y === gridY);
+                        ctx.strokeStyle = canBuild ? "#0F0" : "#F00";
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(gridX * TILE_SIZE, gridY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        ctx.lineWidth = 1;
+                    }
+                }
+            }
+        }
+
+        // Постройка бура
+        function placeDrill(x, y) {
+            const tile = world[y][x];
+            const hasOre = !!tile.ore;
+            const alreadyBuilt = buildings.some(b => b.x === x && b.y === y);
+            if (hasOre && !alreadyBuilt) {
+                buildings.push({ x, y, type: "drill" });
+                drawWorld();
+            }
+        }
+        // Вспомогательная функция: позиция мыши
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        // Простой шум (Perlin-like)
+        Math.perlin2 = function(x, y) {
+            const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 + Math.sin(x * 4.2323 + y * 5.123);
+            return n - Math.floor(n);
+        };
+
+        // Обработчики событий
+        canvas.addEventListener("click", (e) => {
+            if (!isBuildingMode) return;
+            const pos = getMousePos(e);
+            const x = Math.floor(pos.x / TILE_SIZE);
+            const y = Math.floor(pos.y / TILE_SIZE);
+            if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT) {
+                placeDrill(x, y);
+            }
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "b" || e.key === "B") {
+                isBuildingMode = !isBuildingMode;
+                drawWorld();
+                console.log("Режим строительства:", isBuildingMode ? "включён" : "выключён");
+            }
+        });
+
+        // Обновление значений
+        scaleInput.addEventListener("input", updateValues);
+        oreChanceInput.addEventListener("input", updateValues);
+        tileSizeInput.addEventListener("input", updateValues);
+        widthInput.addEventListener("input", updateValues);
+        heightInput.addEventListener("input", updateValues);
+
+        // Перегенерация
+        regenerateBtn.addEventListener("click", generateWorld);
+        // Первый запуск
+        updateValues();
+        generateWorld();
+    </script>
+</body>
+</html>
