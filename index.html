@@ -1,431 +1,592 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Генератор мира (тест3)</title>
-    <style>
-    /* ... (стили те же) ... */
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Мир  (исправлено)</title>
+  <style>
     body {
-        margin: 0;
-        background: #111;
-        font-family: Arial, sans-serif;
-        color: white;
-        padding: 20px;
+      margin: 0;
+      padding: 20px;
+      background-color: #111;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #fff;
     }
-    .container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+
+    h1 {
+      margin-bottom: 10px;
     }
+
     .controls {
-        background: #222;
-        padding: 15px;
-        border-radius: 10px;
-        width: 80%;
-        max-width: 600px;
-        margin-bottom: 20px;
+      margin-bottom: 20px;
+      text-align: center;
     }
+
     .slider-container {
-        margin: 10px 0;
+      margin: 10px 0;
     }
-    label {
-        display: inline-block;
-        width: 240px;
-    }
-    input[type="range"] {
-        width: 200px;
-    }
-    span.value {
-        display: inline-block;
-        width: 50px;
-        text-align: right;
-    }
-    canvas {
-        border: 2px solid #333;
-        image-rendering: pixelated;
-        margin-top: 10px;
-    }
+
     button {
-        background: #0066cc;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 5px;
-        cursor: pointer;
-        margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #ff6b6b;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      margin: 5px;
     }
-    button:hover {
-        background: #0055aa;
+
+    .world-container {
+      width: 90vw;
+      height: 70vh;
+      overflow: hidden;
+      border: 2px solid #333;
+      position: relative;
+      cursor: grab;
+      background-color: #222;
+      touch-action: none; /* Отключаем жесты */
     }
-</style>
+
+    .world-container.dragging {
+      cursor: grabbing;
+    }
+
+    .world-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+    }
+
+    .world {
+      display: grid;
+
+      border: 1px solid transparent;
+    }
+
+    .tile {
+      width: 8px;
+      height: 8px;
+    }
+
+    .lava-core {
+      background-color: #ff4500;
+      animation: pulse 1s infinite alternate;
+    }
+
+    .ash {
+      background-color: #555;
+    }
+
+    .water-shallow {
+      background-color: #4aa2e2;
+    }
+
+    .water-deep {
+      background-color: #1e90ff;
+    }
+
+    @keyframes pulse {
+      from { box-shadow: inset 0 0 4px rgba(255, 100, 0, 0.6); }
+      to { box-shadow: inset 0 0 10px 3px rgba(255, 60, 0, 0.9); }
+    }
+  </style>
 </head>
+
+
+
+
 <body>
-    <div class="container">
-        <h1>🌍 Генератор мира — Без луж и мелких островов</h1>
-        <p>Нажми <strong>B</strong>, чтобы поставить бур.</p>
+  <h1> Мир</h1>
 
-        <div class="controls">
-            <div class="slider-container">
-                <label for="scale">Масштаб шума:</label>
-                <input type="range" id="scale" min="5" max="50" value="20" step="1"/>
-                <span class="value" id="scaleValue">20</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="islandSize">Размер островов:</label>
-                <input type="range" id="islandSize" min="0.5" max="3.0" value="1.0" step="0.1"/>
-                <span class="value" id="islandSizeValue">1.0</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="waterAmount">Кол-во воды:</label>
-                <input type="range" id="waterAmount" min="0.1" max="0.9" value="0.3" step="0.05"/>
-                <span class="value" id="waterAmountValue">0.3</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="oreChance">Шанс руды (%):</label>
-                <input type="range" id="oreChance" min="1" max="30" value="10" step="1"/>
-                <span class="value" id="oreChanceValue">10</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="tileSize">Размер тайла:</label>
-                <input type="range" id="tileSize" min="10" max="40" value="20" step="2"/>
-                <span class="value" id="tileSizeValue">20</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="width">Ширина карты:</label>
-                <input type="range" id="width" min="20" max="100" value="50" step="1"/>
-                <span class="value" id="widthValue">50</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="height">Высота карты:</label>
-                <input type="range" id="height" min="20" max="100" value="40" step="1"/>
-                <span class="value" id="heightValue">40</span>
-            </div>
-
-            <button id="regenerate">Пересоздать мир</button>
-        </div>
-
-        <canvas id="gameCanvas"></canvas>
+  <div class="controls">
+    <div class="slider-container">
+      <label for="sizeSlider">Размер мира: </label>
+      <input type="range" id="sizeSlider" min="50" max="300" value="150" step="10" />
+      <span id="sizeValue">150 × 150</span>
     </div>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+    <div class="slider-container">
+      <label for="zoomSlider">Масштаб: </label>
+      <input type="range" id="zoomSlider" min="50" max="300" value="100" step="10" />
+      <span id="zoomValue">1.0x</span>
+    </div>
 
-        // Элементы управления
-        const scaleInput = document.getElementById("scale");
-        const islandSizeInput = document.getElementById("islandSize");
-        const waterAmountInput = document.getElementById("waterAmount");
-        const oreChanceInput = document.getElementById("oreChance");
-        const tileSizeInput = document.getElementById("tileSize");
-        const widthInput = document.getElementById("width");
-        const heightInput = document.getElementById("height");
-        const regenerateBtn = document.getElementById("regenerate");
+    <button onclick="generateWorld()"> Перегенерировать</button>
+  </div>
 
-        const scaleValue = document.getElementById("scaleValue");
-        const islandSizeValue = document.getElementById("islandSizeValue");
-        const waterAmountValue = document.getElementById("waterAmountValue");
-        const oreChanceValue = document.getElementById("oreChanceValue");
-        const tileSizeValue = document.getElementById("tileSizeValue");
-        const widthValue = document.getElementById("widthValue");
-        const heightValue = document.getElementById("heightValue");
+  <div class="world-container" id="worldContainer">
+    <div class="world-wrapper" id="worldWrapper">
+      <div class="world" id="world"></div>
+    </div>
+  </div>
 
-        let TILE_SIZE = 20;
-        let WIDTH = 50;
-        let HEIGHT = 40;
-        let world = [];
-        let buildings = [];
-        let isBuildingMode = false;
+  <!-- НОВЫЕ ПОЛЗУНКИ -->
+  <div class="slider-container">
+    <label for="noiseScale">Масштаб шума: </label>
+    <input type="range" id="noiseScale" min="1" max="100" value="30" step="1" />
+    <span id="noiseScaleValue">0.03</span> <!-- отображается как 0.01–0.1 -->
+  </div>
 
-        function updateValues() {
-            scaleValue.textContent = scaleInput.value;
-            islandSizeValue.textContent = islandSizeInput.value;
-            waterAmountValue.textContent = waterAmountInput.value;
-            oreChanceValue.textContent = oreChanceInput.value;
-            tileSizeValue.textContent = tileSizeInput.value;
-            widthValue.textContent = widthInput.value;
-            heightValue.textContent = heightInput.value;
+
+  <div class="slider-container">
+    <label for="minBiomeSize">Мин. размер биома (%): </label>
+    <input type="range" id="minBiomeSize" min="1" max="10" value="5" step="1" />
+    <span id="minBiomeSizeValue">5%</span>
+  </div>
+
+</div>
+
+
+
+
+
+
+
+
+  <script>
+    // --- Генератор случайных чисел и шум ---
+    class RNG {
+      constructor(seed) {
+        this.seed = seed || 1;
+      }
+      next() {
+        this.seed = (this.seed * 9301 + 49297) % 233280;
+        return this.seed / 233280;
+      }
+      nextBool(p = 0.5) {
+        return this.next() < p;
+      }
+      range(min, max) {
+        return min + this.next() * (max - min);
+      }
+    }
+
+    function createNoise(seed) {
+      const rng = new RNG(seed);
+      const perm = Array(512);
+      for (let i = 0; i < 256; i++) {
+        perm[i] = perm[i + 256] = Math.floor(rng.next() * 256);
+      }
+      return (x, y) => {
+        const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+        x -= Math.floor(x); y -= Math.floor(y);
+        const u = x * x * (3 - 2 * x), v = y * y * (3 - 2 * y);
+        const g00 = grad(perm[X + perm[Y]], x, y);
+        const g10 = grad(perm[X + 1 + perm[Y]], x - 1, y);
+        const g01 = grad(perm[X + perm[Y + 1]], x, y - 1);
+        const g11 = grad(perm[X + 1 + perm[Y + 1]], x - 1, y - 1);
+        return lerp(v, lerp(u, g00, g10), lerp(u, g01, g11));
+      };
+
+      function lerp(t, a, b) { return a + t * (b - a); }
+      function grad(h, x, y) {
+        return ((h & 1) ? -x : x) + ((h & 2) ? -y : y);
+      }
+    }
+
+    // Простой 2D шум для органичных форм
+function noise2D(x, y, seed) {
+  const rng = new RNG(x * 100 + y * 1000 + seed);
+  let sum = 0;
+  for (let i = 0; i < 4; i++) sum += rng.next();
+  return sum / 4 * 2 - 1; // в диапазоне [-1, 1]
+}
+
+// Создание лавового озера с шумом — органичная форма
+function createLavaLakeNoise(cx, cy, baseRadius, ashSet, size, seed) {
+  const lake = [];
+
+  for (let dy = -baseRadius * 2; dy <= baseRadius * 2; dy++) {
+    for (let dx = -baseRadius * 2; dx <= baseRadius * 2; dx++) {
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      if (distance > baseRadius * 2) continue;
+
+      // Шум для "пятнистости" и естественности
+      const noiseVal = (noise2D(cx + dx * 0.5, cy + dy * 0.5, seed) + 1) / 2;
+      const threshold = 1 - (distance / (baseRadius * 5)); // выше в центре, ниже на краях
+
+      if (noiseVal > threshold * 0.7) {
+        const nx = cx + dx, ny = cy + dy;
+        const key = `${nx},${ny}`;
+        if (nx >= 0 && ny >= 0 && nx < size && ny < size && ashSet.has(key)) {
+          lake.push([nx, ny]);
+        }
+      }
+    }
+  }
+  return lake;
+}
+
+
+
+
+
+    function floodFill(grid, size, x, y, condition) {
+      if (!condition(grid[y][x])) return [];
+      const visited = Array(size).fill().map(() => Array(size).fill(false));
+      const region = [];
+      const stack = [[x, y]];
+      visited[y][x] = true;
+
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        region.push([cx, cy]);
+
+        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= size || ny >= size || visited[ny][nx]) continue;
+          if (condition(grid[ny][nx])) {
+            visited[ny][nx] = true;
+            stack.push([nx, ny]);
+          }
+        }
+      }
+      return region;
+    }
+
+    function createCluster(seed, size, minSize, maxSize, avoidSet) {
+      const rng = new RNG(seed);
+      const cluster = new Set();
+      const visited = Array(size).fill().map(() => Array(size).fill(false));
+
+      let x, y;
+      do {
+        x = Math.floor(rng.next() * size);
+        y = Math.floor(rng.next() * size);
+      } while (visited[y][x] || avoidSet.has(`${x},${y}`));
+
+      const queue = [[x, y]];
+      visited[y][x] = true;
+
+      const targetSize = minSize + Math.floor(rng.next() * (maxSize - minSize + 1));
+
+      while (queue.length && cluster.size < targetSize) {
+        const [cx, cy] = queue.splice(Math.floor(rng.next() * queue.length), 1)[0];
+        const key = `${cx},${cy}`;
+        cluster.add(key);
+
+        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= size || ny >= size || visited[ny][nx] || avoidSet.has(`${nx},${ny}`)) continue;
+          if (rng.next() < 0.95) {
+            visited[ny][nx] = true;
+            queue.push([nx, ny]);
+          }
+        }
+      }
+
+      return Array.from(cluster);
+    }
+
+    // --- Элементы ---
+    const sizeSlider = document.getElementById('sizeSlider');
+    const sizeValue = document.getElementById('sizeValue');
+    const zoomSlider = document.getElementById('zoomSlider');
+    const zoomValue = document.getElementById('zoomValue');
+    const worldContainer = document.getElementById('worldContainer');
+    const worldWrapper = document.getElementById('worldWrapper');
+    const worldEl = document.getElementById('world');
+
+    // --- Переменные ---
+    let isDragging = false;
+    let startX, startY;
+    let translateX = 0, translateY = 0;
+    let currentScale = 1;
+
+    function generateWorld() {
+  const size = parseInt(document.getElementById('sizeSlider').value);
+  document.getElementById('sizeValue').textContent = `${size} × ${size}`;
+
+  // === НОВЫЕ НАСТРОЙКИ ИЗ ПОЛЗУНКОВ ===
+  const noiseScaleValue = parseInt(document.getElementById('noiseScale').value) / 1000; // 1–100 → 0.001–0.1
+
+  const minBiomePercent = parseInt(document.getElementById('minBiomeSize').value) / 100; // 1–10% → 0.01–0.1
+
+  const seed = Math.random() * 10000;
+  const rng = new RNG(seed);
+  const noise = createNoise(seed);
+
+  // === Масштаб шума (чем меньше — крупнее биомы) ===
+  const scale = noiseScaleValue / (size / 100);
+
+  // Остальной код остаётся, но используем новые параметры
+  const grid = Array(size).fill().map(() => Array(size).fill(0));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      grid[y][x] = (noise(x * scale, y * scale) + 1) / 2;
+    }
+  }
+
+  // Занятые тайлы
+  const used = new Set();
+
+  // Очистка
+  worldEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+  worldEl.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+  worldEl.innerHTML = '';
+
+  // === 1. ОКЕАНЫ ===
+  const oceanRegions = [];
+  const numOceans = 1 + Math.floor(rng.next() * 2);
+  const oceanMinSize = Math.floor(size * size * 0.05);
+  const oceanMaxSize = Math.floor(size * size * 0.2);
+
+  for (let i = 0; i < numOceans; i++) {
+    const candidates = [];
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (!used.has(`${x},${y}`)) candidates.push([x, y]);
+      }
+    }
+    if (candidates.length === 0) break;
+
+    const [sx, sy] = candidates[Math.floor(rng.next() * candidates.length)];
+    const region = floodFill(grid, size, sx, sy, val => val < 0.3);
+    if (region.length >= oceanMinSize) {
+      const finalRegion = region.slice(0, oceanMaxSize);
+      oceanRegions.push(finalRegion);
+      for (const [x, y] of finalRegion) used.add(`${x},${y}`);
+    }
+  }
+
+  // === 2. ОЗЁРА ===
+  const lakeRegions = [];
+  const numLakes = Math.floor(size / 40);
+  for (let i = 0; i < numLakes; i++) {
+    const candidates = [];
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (grid[y][x] < 0.25 && !used.has(`${x},${y}`)) {
+          candidates.push([x, y]);
+        }
+      }
+    }
+    if (candidates.length === 0) break;
+
+    const [sx, sy] = candidates[Math.floor(rng.next() * candidates.length)];
+    const region = floodFill(grid, size, sx, sy, val => val < 0.30);
+    if (region.length >= 15) {
+      lakeRegions.push(region);
+      for (const [x, y] of region) used.add(`${x},${y}`);
+    }
+  }
+
+  // === 3. ЛАВОВЫЕ БИОМЫ (пепельная зона) ===
+  const lavaBiomes = [];
+  const numLavaZones = Math.floor(size / 50);
+  const minLavaSize = Math.floor(size * size / 100);
+  const maxLavaSize = Math.floor(size * size / 30);
+
+  for (let i = 0; i < numLavaZones; i++) {
+    const cluster = createCluster(seed + 1000 + i, size, minLavaSize, maxLavaSize, used);
+    if (cluster.length > 0) {
+      lavaBiomes.push(cluster);
+      for (const key of cluster) used.add(key);
+    }
+  }
+
+     // === 4. СОЗДАНИЕ ЛАВОВЫХ ОЗЁР С ПОМОЩЬЮ ШУМА + ПЕПЕЛЬНАЯ КРОМКА ===
+  const lavaTiles = new Set();         // где лава
+  const ashBorderTiles = new Set();    // пепельная кромка
+
+  for (const cluster of lavaBiomes) {
+    const ashSet = new Set(cluster);
+    const clusterSize = cluster.length;
+
+    // Количество озёр зависит от размера биома
+    const lavaLakeCount = Math.max(2, Math.min(8, Math.floor(clusterSize / (size * 1.5))));
+
+    for (let i = 0; i < lavaLakeCount && ashSet.size > 5; i++) {
+      // Случайная стартовая точка в биоме
+      const availableAsh = Array.from(ashSet);
+      if (availableAsh.length === 0) break;
+
+      const [sxStr, syStr] = availableAsh[Math.floor(rng.next() * availableAsh.length)].split(',');
+      const sx = parseInt(sxStr), sy = parseInt(syStr);
+
+      // Размер озера — пропорционален биому
+      const minLakeRadius = 2;
+      const maxLakeRadius = Math.max(3, Math.floor(Math.sqrt(clusterSize) / 4));
+      const baseRadius = minLakeRadius + Math.floor(rng.next() * (maxLakeRadius - minLakeRadius + 1));
+
+      // Создаём озеро с шумом
+      const lake = createLavaLakeNoise(sx, sy, baseRadius, ashSet, size, seed + i);
+
+      // Только если озеро достаточно большое
+      if (lake.length >= 5) {
+        // Добавляем лаву
+        for (const [x, y] of lake) {
+          lavaTiles.add(`${x},${y}`);
+          ashSet.delete(`${x},${y}`); // убираем из пепла
         }
 
-        // Flood Fill — находит все связанные тайлы одного типа
-        function floodFill(startX, startY, isWater) {
-            const visited = new Set();
-            const queue = [];
-            const region = [];
+        // === Пепельная кромка (2–3 тайла) ===
+        const borderThickness = 2 + Math.floor(rng.next() * 2);
+        let currentLayer = [...lake];
 
-            const key = (x, y) => `${x},${y}`;
-            const isValid = (x, y) => x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT;
-
-            queue.push([startX, startY]);
-            visited.add(key(startX, startY));
-
-            const targetTerrain = isWater ? "WATER" : "LAND";
-
-            while (queue.length > 0) {
-                const [x, y] = queue.shift();
-                const tile = world[y][x];
-                const isMatch = isWater ? tile.terrain === "WATER" : tile.terrain !== "WATER" && tile.terrain !== "LAVA";
-
-                if (!isMatch) continue;
-
-                region.push({ x, y });
-
-                const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
-                for (const [dx, dy] of dirs) {
-                    const nx = x + dx, ny = y + dy;
-                    const nKey = key(nx, ny);
-                    if (isValid(nx, ny) && !visited.has(nKey)) {
-                        visited.add(nKey);
-                        queue.push([nx, ny]);
-                    }
-                }
+        for (let layer = 0; layer < borderThickness; layer++) {
+          const nextLayer = [];
+          for (const [x, y] of currentLayer) {
+            for (const [dx, dy] of [[1,0], [-1,0], [0,1], [0,-1]]) {
+              const nx = x + dx, ny = y + dy;
+              const key = `${nx},${ny}`;
+              if (nx >= 0 && ny >= 0 && nx < size && ny < size && ashSet.has(key)) {
+                ashSet.delete(key);
+                ashBorderTiles.add(key);
+                nextLayer.push([nx, ny]);
+              }
             }
-
-            return region;
+          }
+          currentLayer = nextLayer;
         }
+      }
+    }
+  }
+  
+  // === 5. ОТРИСОВКА ===
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const key = `${x},${y}`;
+      const tile = document.createElement('div');
+      tile.classList.add('tile');
 
-        // Удалить маленькие области
-        function removeSmallAreas() {
-            const visitedWater = new Set();
-            const visitedLand = new Set();
-            const key = (x, y) => `${x},${y}`;
-
-            // 1. Удаляем маленькие водоёмы (< 7 тайлов)
-            for (let y = 0; y < HEIGHT; y++) {
-                for (let x = 0; x < WIDTH; x++) {
-                    const k = key(x, y);
-                    if (!visitedWater.has(k) && world[y][x].terrain === "WATER") {
-                        const region = floodFill(x, y, true);
-                        if (region.length < 7) {
-                            // Удаляем — делаем землю
-                            for (const {x: rx, y: ry} of region) {
-                                world[ry][rx].terrain = "GRASS";
-                                visitedWater.add(key(rx, ry));
-                            }
-                        } else {
-                            region.forEach(t => visitedWater.add(key(t.x, t.y)));
-                        }
-                    }
-                }
-            }
-
-            // 2. Удаляем маленькие острова (< 20 тайлов)
-            for (let y = 0; y < HEIGHT; y++) {
-                for (let x = 0; x < WIDTH; x++) {
-                    const k = key(x, y);
-                    if (!visitedLand.has(k) && world[y][x].terrain !== "WATER" && world[y][x].terrain !== "LAVA") {
-                        const region = floodFill(x, y, false);
-                        if (region.length < 20) {
-                            // Удаляем — делаем воду (или песок, но лучше воду)
-                            for (const {x: rx, y: ry} of region) {
-                                world[ry][rx].terrain = "WATER";
-                                visitedLand.add(key(rx, ry));
-                            }
-                        } else {
-                            region.forEach(t => visitedLand.add(key(t.x, t.y)));
-                        }
-                    }
-                }
-            }
+      // Океан
+      let inOcean = false;
+      for (const region of oceanRegions) {
+        if (region.some(([rx, ry]) => rx === x && ry === y)) {
+          tile.classList.add(grid[y][x] < 0.15 ? 'water-deep' : 'water-shallow');
+          tile.title = grid[y][x] < 0.15 ? "Глубокий океан" : "Мелководье";
+          inOcean = true;
+          break;
         }
+      }
+      if (inOcean) {
+        worldEl.appendChild(tile);
+        continue;
+      }
 
-        // Генерация мира
-        function generateWorld() {
-            const scale = parseFloat(scaleInput.value);
-            const islandSize = parseFloat(islandSizeInput.value);
-            const waterLevel = parseFloat(waterAmountInput.value);
-            const oreChance = parseFloat(oreChanceInput.value) / 100;
-            TILE_SIZE = parseInt(tileSizeInput.value);
-            WIDTH = parseInt(widthInput.value);
-            HEIGHT = parseInt(heightInput.value);
-
-            canvas.width = WIDTH * TILE_SIZE;
-            canvas.height = HEIGHT * TILE_SIZE;
-
-            world = [];
-            const noiseMap = [];
-
-            // Генерация шума
-            for (let y = 0; y < HEIGHT; y++) {
-                const row = [];
-                for (let x = 0; x < WIDTH; x++) {
-                    const noise = Math.perlin2(x / (scale / islandSize), y / (scale / islandSize));
-                    row.push(noise);
-                }
-                noiseMap.push(row);
-            }
-
-            // Заполнение мира
-            for (let y = 0; y < HEIGHT; y++) {
-                const row = [];
-                for (let x = 0; x < WIDTH; x++) {
-                    const noise = noiseMap[y][x];
-                    let terrain = "GRASS";
-
-                    if (noise < waterLevel) {
-                        terrain = "WATER";
-                    } else if (noise < waterLevel + 0.1) {
-                        let hasWater = false;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const nx = x + dx, ny = y + dy;
-                                if (nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT && noiseMap[ny][nx] < waterLevel) {
-                                    hasWater = true;
-                                }
-                            }
-                        }
-                        terrain = hasWater ? "SAND" : "GRASS";
-                    } else if (noise < 0.5) {
-                        terrain = "CLAY";
-                    } else if (noise < 0.6) {
-                        terrain = "LAVA";
-                    } else {
-                        terrain = "GRASS";
-                    }
-
-                    // Защита: лава не рядом с водой
-                    if (terrain === "LAVA") {
-                        let hasWaterNear = false;
-                        for (let dy = -1; dy <= 1; dy++) {
-                            for (let dx = -1; dx <= 1; dx++) {
-                                const nx = x + dx, ny = y + dy;
-                                if (nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT && noiseMap[ny][nx] < waterLevel) {
-                                    hasWaterNear = true;
-                                }
-                            }
-                        }
-                        if (hasWaterNear) terrain = "CLAY";
-                    }
-
-                    row.push({ terrain, ore: null, x, y });
-                }
-                world.push(row);
-            }
-
-            // 🔥 Удаляем маленькие области
-            removeSmallAreas();
-
-            // Повторно добавляем руду (только на сухую землю)
-            for (let y = 0; y < HEIGHT; y++) {
-                for (let x = 0; x < WIDTH; x++) {
-                    const tile = world[y][x];
-                    if (Math.random() < oreChance && tile.terrain !== "WATER" && tile.terrain !== "LAVA") {
-                        const r = Math.random();
-                        tile.ore = r < 0.5 ? "COPPER" : r < 0.8 ? "LEAD" : "COAL";
-                    }
-                }
-            }
-
-            buildings = [];
-            drawWorld();
+      // Озеро
+      let inLake = false;
+      for (const region of lakeRegions) {
+        if (region.some(([rx, ry]) => rx === x && ry === y)) {
+          tile.classList.add('water-shallow');
+          tile.title = "Озеро";
+          inLake = true;
+          break;
         }
+      }
+      if (inLake) {
+        worldEl.appendChild(tile);
+        continue;
+      }
 
-        // Рисование — без изменений
-        function drawWorld() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            for (let y = 0; y < HEIGHT; y++) {
-                for (let x = 0; x < WIDTH; x++) {
-                    const tile = world[y][x];
-                    const screenX = x * TILE_SIZE;
-                    const screenY = y * TILE_SIZE;
+            // Лава (озёра ≥5 тайлов)
+      if (lavaTiles.has(key)) {
+        tile.classList.add('lava-core');
+        tile.title = "Озеро лавы";
+        worldEl.appendChild(tile);
+        continue;
+      }
 
-                    let color = "#4CAF50";
-                    if (tile.terrain === "SAND") color = "#D2B48C";
-                    else if (tile.terrain === "WATER") color = "#1E90FF";
-                    else if (tile.terrain === "LAVA") color = "#FF4500";
-                    else if (tile.terrain === "CLAY") color = "#A0522D";
+      // Пепельная кромка (вокруг лавы)
+      if (ashBorderTiles.has(key)) {
+        tile.classList.add('ash');
+        tile.title = "Пепельная кромка";
+        worldEl.appendChild(tile);
+        continue;
+      }
 
-                    ctx.fillStyle = color;
-                    ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-
-                    if (tile.ore) {
-                        const oreColor = tile.ore === "COPPER" ? "#B87333" :
-                                        tile.ore === "LEAD" ? "#696969" : "#363636";
-                        const pad = TILE_SIZE * 0.2;
-                        ctx.fillStyle = oreColor;
-                        ctx.fillRect(screenX + pad, screenY + pad, TILE_SIZE - 2*pad, TILE_SIZE - 2*pad);
-                    }
-
-                    if (buildings.some(b => b.x === x && b.y === y)) {
-                        ctx.fillStyle = "white";
-                        ctx.fillRect(screenX + 6, screenY + 6, TILE_SIZE - 12, TILE_SIZE - 12);
-                        ctx.fillStyle = "gray";
-                        ctx.fillRect(screenX + 8, screenY + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-                    }
-
-                    ctx.strokeStyle = "#0008";
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-                }
-            }
-
-            if (isBuildingMode && window.lastMouseX !== undefined) {
-                const gridX = Math.floor(window.lastMouseX / TILE_SIZE);
-                const gridY = Math.floor(window.lastMouseY / TILE_SIZE);
-                if (gridX >= 0 && gridX < WIDTH && gridY >= 0 && gridY < HEIGHT) {
-                    const tile = world[gridY][gridX];
-                    const canBuild = tile.ore && !buildings.some(b => b.x === gridX && b.y === gridY);
-                    ctx.strokeStyle = canBuild ? "#0F0" : "#F00";
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(gridX * TILE_SIZE, gridY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    ctx.lineWidth = 1;
-                }
-            }
+      // Пепел (остальная часть лавового биома)
+      let inLavaBiome = false;
+      for (const cluster of lavaBiomes) {
+        if (cluster.includes(key) && !lavaTiles.has(key) && !ashBorderTiles.has(key)) {
+          tile.classList.add('ash');
+          tile.title = "Пепел";
+          inLavaBiome = true;
+          break;
         }
+      }
+      if (inLavaBiome) {
+        worldEl.appendChild(tile);
+        continue;
+      } 
+      // Остальная земля
+      const value = grid[y][x];
+      if (value < 0.35) {
+        tile.style.backgroundColor = rng.nextBool(0.85) ? '#f4d078' : '#c19a6b';
+        tile.title = rng.nextBool(0.85) ? "Песок" : "Глина";
+      } else if (value < 0.65) {
+        tile.style.backgroundColor = rng.nextBool(0.8) ? '#2e8b57' : '#c19a6b';
+        tile.title = rng.nextBool(0.8) ? "Трава" : "Глина";
+      } else {
+        tile.style.backgroundColor = rng.nextBool(0.7) ? '#fff' : '#a0eaff';
+        tile.title = rng.nextBool(0.7) ? "Снег" : "Лёд";
+      }
 
-        function placeDrill(x, y) {
-            const tile = world[y][x];
-            if (tile.ore && !buildings.some(b => b.x === x && b.y === y)) {
-                buildings.push({ x, y });
-                drawWorld();
-            }
-        }
+      worldEl.appendChild(tile);
+    }
+  }
 
-        // Вспомогательные
-        Math.perlin2 = (x, y) => {
-            const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 + Math.sin(x * 4.2323 + y * 5.123);
-            return n - Math.floor(n);
-        };
+      // Применить текущий масштаб
+       applyZoom();
+      }
 
-        canvas.addEventListener("mousemove", e => {
-            const rect = canvas.getBoundingClientRect();
-            window.lastMouseX = e.clientX - rect.left;
-            window.lastMouseY = e.clientY - rect.top;
-        });
+      // Сброс позиции и применение масштаба
+      translateX = 0;
+      translateY = 0;
+      worldWrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+    
 
-        canvas.addEventListener("click", e => {
-            if (!isBuildingMode) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-            const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
-            if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT) placeDrill(x, y);
-        });
+    // --- Масштаб ---
+    zoomSlider.oninput = function () {
+      const value = parseInt(this.value);
+      currentScale = value / 100;
+      zoomValue.textContent = currentScale.toFixed(1) + 'x';
+      worldWrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+    };
 
-        document.addEventListener("keydown", e => {
-            if (e.key === "b" || e.key === "B") {
-                isBuildingMode = !isBuildingMode;
-                drawWorld();
-            }
-        });
+    // --- Перетаскивание ---
+    worldContainer.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      worldContainer.classList.add('dragging');
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+    });
 
-        // Ползунки
-        scaleInput.addEventListener("input", updateValues);
-        islandSizeInput.addEventListener("input", updateValues);
-        waterAmountInput.addEventListener("input", updateValues);
-        oreChanceInput.addEventListener("input", updateValues);
-        tileSizeInput.addEventListener("input", updateValues);
-        widthInput.addEventListener("input", updateValues);
-        heightInput.addEventListener("input", updateValues);
-        regenerateBtn.addEventListener("click", generateWorld);
+    document.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      translateX = e.clientX - startX;
+      translateY = e.clientY - startY;
+      worldWrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+    });
 
-        updateValues();
-        generateWorld();
-    </script>
+    document.addEventListener('pointerup', () => {
+      if (isDragging) {
+        isDragging = false;
+        worldContainer.classList.remove('dragging');
+      }
+    });
+
+    document.addEventListener('pointercancel', () => {
+      isDragging = false;
+      worldContainer.classList.remove('dragging');
+    });
+
+    // --- Инициализация ---
+    sizeSlider.oninput = () => {
+      sizeValue.textContent = `${sizeSlider.value} × ${sizeSlider.value}`;
+    };
+
+    window.onload = () => {
+      zoomSlider.oninput();
+      generateWorld();
+    };
+  </script>
 </body>
 </html>
